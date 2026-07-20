@@ -1,0 +1,46 @@
+name: buildgraph
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: buildgraph
+      POSTGRES_USER: buildgraph
+      POSTGRES_PASSWORD: buildgraph_local
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U buildgraph -d buildgraph']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.6-alpine
+    environment:
+      CLICKHOUSE_DB: buildgraph
+      CLICKHOUSE_USER: buildgraph
+      CLICKHOUSE_PASSWORD: buildgraph_local
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1'
+    ports:
+      - '8124:8123'
+      - '9001:9000'
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          "clickhouse-client --user buildgraph --password buildgraph_local --query 'SELECT 1'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  postgres-data:
+  clickhouse-data:

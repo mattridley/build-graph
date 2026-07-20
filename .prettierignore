@@ -1,0 +1,8 @@
+.next
+.ai/context/specs
+coverage
+node_modules
+pnpm-lock.yaml
+playwright-report
+SPEC.md
+test-results
