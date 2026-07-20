@@ -37,9 +37,13 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm exec playwright install chromium
+pnpm test:e2e
 ```
 
 The production build intentionally succeeds without service variables. Code that actually opens a database or service connection uses lazy clients and fails with a clear `ConfigurationError` when required runtime configuration is absent.
+
+GitHub Actions runs the same quality gates, verifies that the Docker Compose services become healthy, and executes the Playwright smoke tests against a production build. Failed browser runs retain their HTML report for seven days.
 
 ## Local services
 

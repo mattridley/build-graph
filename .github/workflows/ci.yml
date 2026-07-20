@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -29,13 +33,42 @@ jobs:
       - run: pnpm build
 
   integration:
-    if: ${{ false }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - run: echo "Docker-backed integration tests become required with the data layer."
+      - uses: actions/checkout@v4
+      - name: Start local data services
+        run: docker compose up -d --wait
+      - name: Show healthy services
+        run: docker compose ps
+      - name: Capture service logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop local data services
+        if: always()
+        run: docker compose down --volumes
 
   browser:
-    if: ${{ false }}
+    needs: quality
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - run: echo "Playwright becomes required with the interactive investigation flow."
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+      - run: pnpm test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
