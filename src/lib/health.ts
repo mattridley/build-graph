@@ -1,4 +1,7 @@
-import { getClickHouseClient, getPostgresClient } from '@/lib/clients'
+import { sql } from 'drizzle-orm'
+
+import { getClickHouse, getPostgres } from '@/lib/clients'
+import { checkClickHouseHealth } from '@/lib/clickhouse/storage'
 import {
   readOptionalRuntimeEnvironment,
   type OptionalRuntimeEnvironment,
@@ -81,7 +84,7 @@ async function probePostgres(configured: boolean): Promise<Reachability> {
   if (!configured) return 'not_configured'
 
   try {
-    await getPostgresClient()`select 1`
+    await getPostgres().db.execute(sql`select 1`)
     return 'reachable'
   } catch {
     return 'unreachable'
@@ -92,8 +95,9 @@ async function probeClickHouse(configured: boolean): Promise<Reachability> {
   if (!configured) return 'not_configured'
 
   try {
-    const result = await getClickHouseClient().ping()
-    return result.success ? 'reachable' : 'unreachable'
+    return (await checkClickHouseHealth(getClickHouse()))
+      ? 'reachable'
+      : 'unreachable'
   } catch {
     return 'unreachable'
   }
