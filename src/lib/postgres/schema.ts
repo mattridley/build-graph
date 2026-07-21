@@ -315,6 +315,28 @@ export const outboxEvents = pgTable(
   ],
 )
 
+export const demoDataProvenance = pgTable(
+  'demo_data_provenance',
+  {
+    id: uuid('id').primaryKey(),
+    datasetSlug: text('dataset_slug').notNull(),
+    seed: integer('seed').notNull(),
+    namespaceUuid: uuid('namespace_uuid').notNull(),
+    generatorVersion: text('generator_version').notNull(),
+    fictional: integer('fictional').notNull().default(1),
+    notice: text('notice').notNull(),
+    manifest: jsonb('manifest').$type<Record<string, unknown>>().notNull(),
+    recordedAt: timestamp('recorded_at', {
+      withTimezone: true,
+      mode: 'date',
+    }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('demo_data_provenance_dataset_uq').on(table.datasetSlug),
+    check('demo_data_provenance_fictional_check', sql`${table.fictional} = 1`),
+  ],
+)
+
 export const postgresSchema = {
   projects,
   scopeGroups,
@@ -323,4 +345,5 @@ export const postgresSchema = {
   scenarios,
   investigations,
   outboxEvents,
+  demoDataProvenance,
 }

@@ -222,6 +222,24 @@ export async function findExistingProjectionEventIds(
   return new Set(rows.map((row) => row.event_id))
 }
 
+export async function findExistingCiRunIds(
+  runIds: string[],
+  client: ClickHouseClient = getClickHouse(),
+) {
+  if (runIds.length === 0) return new Set<string>()
+  const ids = z.array(z.string().min(1)).max(10_000).parse(runIds)
+  const result = await client.query({
+    query:
+      'SELECT run_id FROM ci_run_events WHERE run_id IN {runIds:Array(String)}',
+    query_params: { runIds: ids },
+    format: 'JSONEachRow',
+  })
+  const rows = z
+    .array(z.object({ run_id: z.string().min(1) }))
+    .parse(await result.json())
+  return new Set(rows.map((row) => row.run_id))
+}
+
 export function queryCiRunEvents(
   projectId: string,
   limit = 1_000,
