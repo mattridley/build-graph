@@ -32,6 +32,8 @@ const deliveryEdgeSchema = z
 
 export const forecastResultSchema = z.object({
   investigationId: z.uuid(),
+  seed: z.number().int(),
+  sampleCount: z.number().int().positive(),
   verdict: z.object({
     headline: z.string().min(1),
     targetDate: z.iso.date(),
@@ -71,6 +73,23 @@ export const forecastResultSchema = z.object({
       detail: z.string(),
     }),
   ),
+  analytics: z.object({
+    nodeMetrics: z.array(
+      z.object({
+        itemId: z.string().min(1),
+        criticalityFrequency: z.number().min(0).max(1),
+        expectedDelayHours: z.number().nonnegative(),
+        distributionFallback: z.enum(['kind_size', 'kind', 'global']),
+      }),
+    ),
+    blockerRankings: z.array(
+      z.object({
+        itemId: z.string().min(1),
+        rank: z.number().int().positive(),
+        expectedDelayHours: z.number().nonnegative(),
+      }),
+    ),
+  }),
 })
 
 export type InvestigationIntent = z.infer<typeof investigationIntentSchema>
