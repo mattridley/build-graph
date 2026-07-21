@@ -7,12 +7,10 @@ export default defineConfig({
     alias: { 'server-only': resolve(process.cwd(), 'vitest.server-only.ts') },
   },
   test: {
-    environment: 'jsdom',
+    environment: 'node',
     globals: true,
-    setupFiles: ['./vitest.setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
-    coverage: {
-      reporter: ['text', 'html'],
-    },
+    include: ['tests/integration/**/*.test.ts'],
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 })

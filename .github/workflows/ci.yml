@@ -37,8 +37,28 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Start local data services
         run: docker compose up -d --wait
+      - name: Migrate and test storage
+        env:
+          DATABASE_URL: postgresql://buildgraph:buildgraph_local@localhost:5433/buildgraph
+          CLICKHOUSE_HOST: http://localhost:8124
+          CLICKHOUSE_USERNAME: buildgraph
+          CLICKHOUSE_PASSWORD: buildgraph_local
+          CLICKHOUSE_DATABASE: buildgraph
+          RUN_DATABASE_INTEGRATION: '1'
+        run: |
+          pnpm db:migrate
+          pnpm db:migrate
+          pnpm test:integration
       - name: Show healthy services
         run: docker compose ps
       - name: Capture service logs on failure
