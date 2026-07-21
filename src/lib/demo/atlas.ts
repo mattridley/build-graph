@@ -130,6 +130,7 @@ function statusFor(index: number): DemoStatus {
 
 function sizeFor(index: number): DemoSize {
   if (kinds[index] === 'milestone') return 'xs'
+  if (index >= 30 && index <= 33) return 'xl'
   return (['m', 's', 'l', 'm', 'xs'] as const)[index % 5]
 }
 

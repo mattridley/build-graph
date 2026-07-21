@@ -9,7 +9,7 @@ describe('Atlas fixture', () => {
       JSON.stringify(buildAtlasFixture()),
     )
     expect(atlasFixtureDigest()).toBe(
-      '7fccaa34b29d7724b7d315dac670a7252698965f878accd8aeda9f69b616a8b1',
+      '440ab41e53160a247f651d1666283372f8240a44becbd479283cadf6d227297d',
     )
   })
 

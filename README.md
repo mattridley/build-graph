@@ -73,6 +73,13 @@ The generator uses Europe/London weekdays from 09:00–17:00 without a holiday c
 single seed, UUID namespace, fixture, calibration ranges, and small fast-test configuration
 are checked in under `src/lib/demo`.
 
+The framework-independent forecast engine lives under `src/lib/forecast`. It uses 2,500
+seeded Monte Carlo samples per production scenario, deterministic triangular duration
+sampling, exact → kind → global history fallback, and Europe/London business-time DAG
+scheduling. The same seed and sample identity produce the same path and completion result
+regardless of shard boundaries. Its output is a validated `ForecastResult`; the short verdict
+contains only computed values and always includes the scenario-model disclaimer.
+
 ## Quality gates
 
 ```bash
