@@ -13,7 +13,7 @@ export interface ForecastProject {
   targetDate: string
   workingDayStart: '09:00:00'
   workingDayEnd: '17:00:00'
-  enabledWeekdays: readonly [1, 2, 3, 4, 5] | number[]
+  enabledWeekdays: number[]
 }
 
 export interface ForecastScopeGroup {
