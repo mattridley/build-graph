@@ -278,6 +278,32 @@ export function queryForecastSamples(
   )
 }
 
+export async function findExistingForecastSampleNumbers(
+  investigationId: string,
+  scenarioId: string,
+  firstSample: number,
+  lastSample: number,
+  client: ClickHouseClient = getClickHouse(),
+) {
+  const result = await client.query({
+    query: `SELECT sample_number FROM forecast_samples
+      WHERE investigation_id = {investigationId:UUID}
+        AND scenario_id = {scenarioId:UUID}
+        AND sample_number BETWEEN {firstSample:UInt32} AND {lastSample:UInt32}`,
+    query_params: {
+      investigationId: uuid.parse(investigationId),
+      scenarioId: uuid.parse(scenarioId),
+      firstSample: z.number().int().nonnegative().parse(firstSample),
+      lastSample: z.number().int().nonnegative().parse(lastSample),
+    },
+    format: 'JSONEachRow',
+  })
+  const rows = z
+    .array(z.object({ sample_number: z.coerce.number().int().nonnegative() }))
+    .parse(await result.json())
+  return new Set(rows.map((row) => row.sample_number))
+}
+
 export function queryForecastItemImpacts(
   investigationId: string,
   scenarioId: string,
@@ -285,10 +311,21 @@ export function queryForecastItemImpacts(
 ) {
   return queryRows(
     `SELECT project_id, investigation_id, scenario_id, item_id,
-      criticality_frequency, expected_delay_hours, sample_count
-     FROM forecast_item_impacts
-     WHERE investigation_id = {investigationId:UUID}
-       AND scenario_id = {scenarioId:UUID}
+      sum(weighted_criticality) / sum(impact_sample_count)
+        AS criticality_frequency,
+      sum(weighted_delay_hours) / sum(impact_sample_count)
+        AS expected_delay_hours,
+      toUInt32(sum(impact_sample_count)) AS sample_count
+     FROM (
+       SELECT project_id, investigation_id, scenario_id, item_id,
+         criticality_frequency * sample_count AS weighted_criticality,
+         expected_delay_hours * sample_count AS weighted_delay_hours,
+         sample_count AS impact_sample_count
+       FROM forecast_item_impacts
+       WHERE investigation_id = {investigationId:UUID}
+         AND scenario_id = {scenarioId:UUID}
+     )
+     GROUP BY project_id, investigation_id, scenario_id, item_id
      ORDER BY criticality_frequency DESC`,
     {
       investigationId: uuid.parse(investigationId),
