@@ -30,7 +30,11 @@ describe('forecast realtime boundary', () => {
       'forecast-release',
       { investigationId: workflowIds.investigation },
       expect.objectContaining({
-        idempotencyKey: ['forecast-release', workflowIds.investigation],
+        idempotencyKey: [
+          'forecast-release',
+          workflowIds.investigation,
+          'initial',
+        ],
         idempotencyKeyTTL: '7d',
       }),
     )
