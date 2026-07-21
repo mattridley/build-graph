@@ -56,6 +56,23 @@ The runtime selects Neon through `@neondatabase/serverless` for `*.neon.tech`
 URLs and the standard Postgres transport for Docker, while repositories use the
 same lazy Drizzle boundary in either environment.
 
+## Synthetic Atlas dataset
+
+**Every Atlas record is fictional and synthetic.** The project, repository-like references,
+delivery history, CI failures, actors, evidence, and scenarios do not describe an employer,
+private repository, or real person. This notice is also stored in Postgres with the seed,
+UUID namespace, generator version, counts, and fixture SHA-256 provenance record.
+
+Run the Trigger.dev task `seed-demo-data` after applying both database migrations. It upserts
+the 42-node/52-dependency Atlas graph and its three scenarios, streams 250,000 delivery events
+and 50,000 CI runs in deterministic bounded chunks across 18 completed historical cohorts,
+and then verifies the projections and calibration contract. Re-running the task is safe:
+Postgres records use stable IDs and ClickHouse chunks use stable tokens plus ID checks.
+
+The generator uses Europe/London weekdays from 09:00–17:00 without a holiday calendar. Its
+single seed, UUID namespace, fixture, calibration ranges, and small fast-test configuration
+are checked in under `src/lib/demo`.
+
 ## Quality gates
 
 ```bash
