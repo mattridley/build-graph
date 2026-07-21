@@ -9,6 +9,7 @@ import {
   investigationIntentSchema,
 } from '@/lib/contracts/forecast'
 import { assertAcyclic } from '@/lib/postgres/graph'
+import { requestOutboxSync } from '@/lib/outbox/notify'
 import {
   dependencies,
   investigations,
@@ -105,7 +106,7 @@ export async function createInvestigation(
   override?: PostgresConnection,
 ) {
   const value = createInvestigationSchema.parse(input)
-  return connection(override).transaction(async (tx) => {
+  const created = await connection(override).transaction(async (tx) => {
     const [created] = await tx.insert(investigations).values(value).returning()
     if (!created) throw new Error('Investigation insert returned no row')
     await tx.insert(outboxEvents).values({
@@ -113,13 +114,18 @@ export async function createInvestigation(
       aggregateId: created.id,
       eventType: 'investigation.created',
       payload: outboxPayloadSchema.parse({
+        version: 1,
         investigationId: created.id,
         projectId: created.projectId,
+        intentKind: created.parsedIntent.kind,
+        selectedScenarioIds: created.selectedScenarioIds,
         status: created.status,
       }),
     })
     return created
   })
+  await requestOutboxSync(`investigation:${created.id}`)
+  return created
 }
 
 const updateInvestigationSchema = z
@@ -141,7 +147,7 @@ export async function updateInvestigation(
 ) {
   const id = uuidSchema.parse(investigationId)
   const value = updateInvestigationSchema.parse(patch)
-  return connection(override).transaction(async (tx) => {
+  const updated = await connection(override).transaction(async (tx) => {
     const [updated] = await tx
       .update(investigations)
       .set({ ...value, updatedAt: new Date() })
@@ -153,13 +159,18 @@ export async function updateInvestigation(
       aggregateId: id,
       eventType: 'investigation.updated',
       payload: outboxPayloadSchema.parse({
+        version: 1,
         investigationId: id,
         projectId: updated.projectId,
+        intentKind: updated.parsedIntent.kind,
+        selectedScenarioIds: updated.selectedScenarioIds,
         status: updated.status,
       }),
     })
     return updated
   })
+  await requestOutboxSync(`investigation:${updated.id}`)
+  return updated
 }
 
 export async function getInvestigation(
@@ -190,12 +201,153 @@ const dependencySchema = z.object({
   successorId: uuidSchema,
 })
 
+const createWorkItemSchema = z.object({
+  id: uuidSchema.optional(),
+  projectId: uuidSchema,
+  scopeGroupId: uuidSchema.nullable().optional(),
+  kind: z.enum(['requirement', 'task', 'pull_request', 'test', 'milestone']),
+  status: z.enum(['todo', 'in_progress', 'blocked', 'done']).default('todo'),
+  title: z.string().trim().min(1).max(500),
+  description: z.string().max(10_000).default(''),
+  size: z.enum(['xs', 's', 'm', 'l', 'xl']),
+  progressPercent: z.number().int().min(0).max(100).default(0),
+  sourceUrl: z.url().nullable().optional(),
+  sourceReference: z.string().max(500).nullable().optional(),
+  graphX: z.number().finite().nullable().optional(),
+  graphY: z.number().finite().nullable().optional(),
+  startedAt: z.date().nullable().optional(),
+  completedAt: z.date().nullable().optional(),
+})
+
+const updateWorkItemSchema = createWorkItemSchema
+  .omit({ id: true, projectId: true })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, 'No changes supplied')
+
+function workItemOutboxPayload(
+  item: typeof workItems.$inferSelect,
+  eventKind: 'created' | 'updated' | 'deleted' | 'completed',
+  startingStatus: typeof item.status | null,
+) {
+  const durationHours =
+    item.startedAt && item.completedAt
+      ? Math.max(
+          0,
+          (item.completedAt.getTime() - item.startedAt.getTime()) / 3_600_000,
+        )
+      : null
+  return outboxPayloadSchema.parse({
+    version: 1,
+    projectId: item.projectId,
+    itemId: item.id,
+    eventKind,
+    itemKind: item.kind,
+    status: item.status,
+    startingStatus,
+    size: item.size,
+    progressPercent: item.progressPercent,
+    durationHours,
+    source: 'application',
+    actor: null,
+    properties: {
+      sourceUrl: item.sourceUrl,
+      sourceReference: item.sourceReference,
+    },
+  })
+}
+
+export async function createWorkItem(
+  input: z.input<typeof createWorkItemSchema>,
+  override?: PostgresConnection,
+) {
+  const value = createWorkItemSchema.parse(input)
+  const created = await connection(override).transaction(async (tx) => {
+    const [item] = await tx.insert(workItems).values(value).returning()
+    if (!item) throw new Error('Work item insert returned no row')
+    await tx.insert(outboxEvents).values({
+      aggregateType: 'work_item',
+      aggregateId: item.id,
+      eventType: 'work_item.changed',
+      payload: workItemOutboxPayload(item, 'created', null),
+    })
+    return item
+  })
+  await requestOutboxSync(`project:${created.projectId}`)
+  return created
+}
+
+export async function updateWorkItem(
+  workItemId: string,
+  patch: z.input<typeof updateWorkItemSchema>,
+  override?: PostgresConnection,
+) {
+  const id = uuidSchema.parse(workItemId)
+  const value = updateWorkItemSchema.parse(patch)
+  const updated = await connection(override).transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(workItems)
+      .where(eq(workItems.id, id))
+      .limit(1)
+      .for('update')
+    if (!current) throw new RecordNotFoundError('Work item', id)
+    const completedAt =
+      value.status === 'done' && value.completedAt === undefined
+        ? new Date()
+        : value.completedAt
+    const [item] = await tx
+      .update(workItems)
+      .set({ ...value, completedAt, updatedAt: new Date() })
+      .where(eq(workItems.id, id))
+      .returning()
+    if (!item) throw new RecordNotFoundError('Work item', id)
+    await tx.insert(outboxEvents).values({
+      aggregateType: 'work_item',
+      aggregateId: item.id,
+      eventType: 'work_item.changed',
+      payload: workItemOutboxPayload(
+        item,
+        item.status === 'done' && current.status !== 'done'
+          ? 'completed'
+          : 'updated',
+        current.status,
+      ),
+    })
+    return item
+  })
+  await requestOutboxSync(`project:${updated.projectId}`)
+  return updated
+}
+
+export async function deleteWorkItem(
+  workItemId: string,
+  override?: PostgresConnection,
+) {
+  const id = uuidSchema.parse(workItemId)
+  const deleted = await connection(override).transaction(async (tx) => {
+    const [item] = await tx
+      .delete(workItems)
+      .where(eq(workItems.id, id))
+      .returning()
+    if (!item) throw new RecordNotFoundError('Work item', id)
+    await tx.insert(outboxEvents).values({
+      aggregateType: 'work_item',
+      aggregateId: item.id,
+      eventType: 'work_item.changed',
+      payload: workItemOutboxPayload(item, 'deleted', item.status),
+    })
+    return item
+  })
+  await requestOutboxSync(`project:${deleted.projectId}`)
+  return deleted
+}
+
 export async function createDependency(
   input: z.input<typeof dependencySchema>,
   override?: PostgresConnection,
 ) {
   const edge = dependencySchema.parse(input)
-  return connection(override).transaction(async (tx) => {
+  const created = await connection(override).transaction(async (tx) => {
     const [items, existingEdges] = await Promise.all([
       tx
         .select({ id: workItems.id })
@@ -226,10 +378,16 @@ export async function createDependency(
       aggregateType: 'project',
       aggregateId: edge.projectId,
       eventType: 'dependency.created',
-      payload: outboxPayloadSchema.parse(edge),
+      payload: outboxPayloadSchema.parse({
+        version: 1,
+        ...edge,
+        type: 'finish_to_start',
+      }),
     })
     return created
   })
+  await requestOutboxSync(`project:${edge.projectId}`)
+  return created
 }
 
 export async function removeDependency(
@@ -237,7 +395,7 @@ export async function removeDependency(
   override?: PostgresConnection,
 ) {
   const edge = dependencySchema.parse(input)
-  return connection(override).transaction(async (tx) => {
+  const removed = await connection(override).transaction(async (tx) => {
     const [removed] = await tx
       .delete(dependencies)
       .where(
@@ -257,10 +415,16 @@ export async function removeDependency(
       aggregateType: 'project',
       aggregateId: edge.projectId,
       eventType: 'dependency.removed',
-      payload: outboxPayloadSchema.parse(edge),
+      payload: outboxPayloadSchema.parse({
+        version: 1,
+        ...edge,
+        type: 'finish_to_start',
+      }),
     })
     return removed
   })
+  await requestOutboxSync(`project:${edge.projectId}`)
+  return removed
 }
 
 export interface ClaimOutboxOptions {

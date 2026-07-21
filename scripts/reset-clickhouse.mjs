@@ -7,6 +7,14 @@ const client = createClient({
   database: process.env.CLICKHOUSE_DATABASE,
 })
 const tables = [
+  'daily_throughput_aggregates_mv',
+  'ci_workflow_aggregates_mv',
+  'blocked_duration_aggregates_mv',
+  'cycle_time_aggregates_mv',
+  'daily_throughput_aggregates',
+  'ci_workflow_aggregates',
+  'blocked_duration_aggregates',
+  'cycle_time_aggregates',
   'investigation_events',
   'forecast_summaries',
   'forecast_item_impacts',

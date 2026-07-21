@@ -14,7 +14,15 @@ export const deliveryEventSchema = z.object({
   project_id: uuid,
   item_id: uuid,
   event_kind: z.string().min(1),
+  item_kind: z
+    .enum(['requirement', 'task', 'pull_request', 'test', 'milestone'])
+    .nullable()
+    .default(null),
   status: z.enum(['todo', 'in_progress', 'blocked', 'done']).nullable(),
+  starting_status: z
+    .enum(['todo', 'in_progress', 'blocked', 'done'])
+    .nullable()
+    .default(null),
   size: z.enum(['xs', 's', 'm', 'l', 'xl']).nullable(),
   progress_percent: z.number().int().min(0).max(100).nullable(),
   duration_hours: z.number().nonnegative().nullable(),
@@ -114,7 +122,11 @@ async function insertRows<T>(
     const chunkNumber = offset / chunkSize
     const clickhouseSettings: ClickHouseSettings = {
       date_time_input_format: 'best_effort',
+      insert_deduplicate: 1,
       deduplicate_blocks_in_dependent_materialized_views: 1,
+      log_comment: options.deduplicationToken
+        ? `buildgraph:${options.deduplicationToken}:${chunkNumber}`
+        : 'buildgraph:bulk-insert',
       ...(options.deduplicationToken
         ? {
             insert_deduplication_token: `${options.deduplicationToken}:${chunkNumber}`,
@@ -182,8 +194,9 @@ export function queryDeliveryEvents(
   client?: ClickHouseClient,
 ) {
   return queryRows(
-    `SELECT event_id, project_id, item_id, event_kind, status, size,
-      progress_percent, duration_hours, source, actor, properties, occurred_at
+    `SELECT event_id, project_id, item_id, event_kind, item_kind, status,
+      starting_status, size, progress_percent, duration_hours, source, actor,
+      properties, occurred_at
      FROM delivery_events
      WHERE project_id = {projectId:UUID}
      ORDER BY occurred_at DESC LIMIT {limit:UInt32}`,
@@ -191,6 +204,22 @@ export function queryDeliveryEvents(
     deliveryEventSchema,
     client,
   )
+}
+
+export async function findExistingProjectionEventIds(
+  table: 'delivery_events' | 'investigation_events',
+  eventIds: string[],
+  client: ClickHouseClient = getClickHouse(),
+) {
+  if (eventIds.length === 0) return new Set<string>()
+  const ids = z.array(uuid).max(10_000).parse(eventIds)
+  const result = await client.query({
+    query: `SELECT event_id FROM ${table} WHERE event_id IN {eventIds:Array(UUID)}`,
+    query_params: { eventIds: ids },
+    format: 'JSONEachRow',
+  })
+  const rows = z.array(z.object({ event_id: uuid })).parse(await result.json())
+  return new Set(rows.map((row) => row.event_id))
 }
 
 export function queryCiRunEvents(

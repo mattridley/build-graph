@@ -10,6 +10,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['tests/integration/**/*.test.ts'],
+    maxWorkers: 1,
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },
