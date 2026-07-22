@@ -32,6 +32,14 @@ function criticalEdges(path: string[]) {
   )
 }
 
+export function compactPosition(index: number) {
+  const columns = 5
+  const row = Math.floor(index / columns)
+  const offset = index % columns
+  const column = row % 2 === 0 ? offset : columns - offset - 1
+  return { x: 48 + column * 230, y: 48 + row * 126 }
+}
+
 export function buildGraphElements({
   project,
   result,
@@ -50,7 +58,7 @@ export function buildGraphElements({
       metric.expectedDelayHours,
     ]) ?? [],
   )
-  const nodes: DeliveryGraphNode[] = project.workItems.map((item) => {
+  const nodes: DeliveryGraphNode[] = project.workItems.map((item, index) => {
     const forecast = resultNodes.get(item.id) as
       Record<string, unknown> | undefined
     const delayHours = delayById.get(item.id) ?? 0
@@ -59,10 +67,7 @@ export function buildGraphElements({
       type: 'delivery',
       width: 190,
       height: delayHours > 0 ? 90 : 72,
-      position: {
-        x: item.graphX ?? 120,
-        y: item.graphY ?? 100,
-      },
+      position: compactPosition(index),
       data: {
         title: (forecast?.title as string | undefined) ?? item.title,
         kind: (forecast?.kind as string | undefined) ?? item.kind,
@@ -131,7 +136,7 @@ export function DeliveryGraph({
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.16 }}
-        minZoom={0.04}
+        minZoom={0.2}
         maxZoom={1.6}
         nodesFocusable
         edgesFocusable

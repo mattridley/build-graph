@@ -151,7 +151,10 @@ function taskDependencies(): ForecastWorkflowDependencies {
           p95_completion_date: summary.p95,
           sample_count: summary.sampleCount,
         })),
-        { deduplicationToken: `${token}:summaries` },
+        {
+          deduplicationToken: `${token}:summaries`,
+          correlationId: investigation.id,
+        },
       )
       await insertInvestigationEvents(
         [
@@ -177,7 +180,10 @@ function taskDependencies(): ForecastWorkflowDependencies {
             occurred_at: new Date().toISOString(),
           },
         ],
-        { deduplicationToken: `${token}:investigation-event` },
+        {
+          deduplicationToken: `${token}:investigation-event`,
+          correlationId: investigation.id,
+        },
       )
       await updateInvestigation(investigation.id, {
         status: 'completed',

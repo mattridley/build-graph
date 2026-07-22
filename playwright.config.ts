@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
+const externalServer = process.env.PLAYWRIGHT_EXTERNAL_SERVER === '1'
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -19,11 +20,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: process.env.CI
-      ? `pnpm start --port ${port}`
-      : `pnpm dev --port ${port}`,
-    url: `http://127.0.0.1:${port}`,
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: externalServer
+    ? undefined
+    : {
+        command: process.env.CI
+          ? `pnpm start --port ${port}`
+          : `pnpm dev --port ${port}`,
+        url: `http://127.0.0.1:${port}`,
+        reuseExistingServer: !process.env.CI,
+      },
 })
