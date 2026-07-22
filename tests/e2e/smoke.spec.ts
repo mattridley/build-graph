@@ -18,6 +18,14 @@ test('renders and navigates the investigation dashboard without browser errors',
   await expect(page.getByText(/SYNTHETIC DEMO/)).toBeVisible()
   await expect(page.getByText('42%')).toBeVisible()
   await expect(page.getByLabel('Your Vercel AI Gateway key')).toHaveValue('')
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        local: Object.keys(localStorage),
+        session: Object.keys(sessionStorage),
+      })),
+    )
+    .toEqual({ local: [], session: [] })
   await expect(
     page.getByRole('button', { name: /Select Atlas v1 release/ }),
   ).toBeVisible()
@@ -46,6 +54,8 @@ test('returns a sanitized health response without runtime configuration', async 
   const response = await request.get('/api/health')
 
   expect(response.ok()).toBe(true)
+  expect(response.headers()['x-correlation-id']).toMatch(/^[0-9a-f-]{36}$/)
+  expect(response.headers()['cache-control']).toBe('no-store')
   await expect(response.json()).resolves.toEqual({
     application: {
       name: 'build-graph',

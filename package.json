@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
+    "security:check": "node scripts/verify-public-safety.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs && node scripts/migrate-clickhouse.mjs",
     "db:migrate:local": "node --env-file=.env.local scripts/migrate-postgres.mjs && node --env-file=.env.local scripts/migrate-clickhouse.mjs",
     "db:reset": "node scripts/reset-postgres.mjs && node scripts/reset-clickhouse.mjs",

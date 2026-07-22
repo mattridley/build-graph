@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { createHash } from 'node:crypto'
+
 import type { ClickHouseClient, ClickHouseSettings } from '@clickhouse/client'
 import { z } from 'zod'
 
@@ -96,7 +98,14 @@ export const investigationEventSchema = z.object({
 export interface BulkInsertOptions {
   chunkSize?: number
   deduplicationToken?: string
+  correlationId?: string
   client?: ClickHouseClient
+}
+
+function clickHouseQueryId(operation: string, correlationId?: string) {
+  if (!correlationId) return undefined
+  const safe = correlationId.replace(/[^a-zA-Z0-9_-]/gu, '_').slice(0, 80)
+  return `buildgraph_${operation}_${safe}`
 }
 
 async function insertRows<T>(
@@ -137,6 +146,10 @@ async function insertRows<T>(
       table,
       values: parsed.slice(offset, offset + chunkSize),
       format: 'JSONEachRow',
+      query_id: clickHouseQueryId(
+        `${table}_${chunkNumber}`,
+        options.correlationId,
+      ),
       clickhouse_settings: clickhouseSettings,
     })
   }
@@ -178,11 +191,17 @@ async function queryRows<T>(
   queryParams: Record<string, string | number>,
   schema: z.ZodType<T>,
   client: ClickHouseClient = getClickHouse(),
+  correlationId?: string,
 ) {
+  const operation = `query_${createHash('sha256')
+    .update(query)
+    .digest('hex')
+    .slice(0, 10)}`
   const result = await client.query({
     query,
     query_params: queryParams,
     format: 'JSONEachRow',
+    query_id: clickHouseQueryId(operation, correlationId),
     clickhouse_settings: { date_time_output_format: 'iso' },
   })
   return z.array(schema).parse(await result.json())
@@ -275,6 +294,7 @@ export function queryForecastSamples(
     },
     forecastSampleSchema,
     client,
+    investigationId,
   )
 }
 
@@ -297,6 +317,7 @@ export async function findExistingForecastSampleNumbers(
       lastSample: z.number().int().nonnegative().parse(lastSample),
     },
     format: 'JSONEachRow',
+    query_id: clickHouseQueryId('existing_samples', investigationId),
   })
   const rows = z
     .array(z.object({ sample_number: z.coerce.number().int().nonnegative() }))
@@ -333,6 +354,7 @@ export function queryForecastItemImpacts(
     },
     forecastItemImpactSchema,
     client,
+    investigationId,
   )
 }
 
@@ -350,6 +372,7 @@ export function queryForecastSummaries(
     { investigationId: uuid.parse(investigationId) },
     forecastSummarySchema,
     client,
+    investigationId,
   )
 }
 
@@ -366,6 +389,7 @@ export function queryInvestigationEvents(
     { investigationId: uuid.parse(investigationId) },
     investigationEventSchema,
     client,
+    investigationId,
   )
 }
 

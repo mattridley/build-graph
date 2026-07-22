@@ -111,7 +111,7 @@ async function beginRun(
   try {
     const handle = await deps.start(investigation.id, {
       runKey,
-      tags: [`project:${DEMO_PROJECT_ID}`],
+      tags: [`project:${DEMO_PROJECT_ID}`, `correlation:${investigation.id}`],
     })
     await deps.update(investigation.id, {
       status: 'queued',
@@ -150,9 +150,10 @@ export async function createQuestionInvestigation(
     gatewayApiKey: string
     generator?: IntentGenerator
     now?: Date
+    investigationId?: string
   },
 ): Promise<ChatInvestigationOutcome> {
-  const investigationId = z.uuid().parse(deps.uuid())
+  const investigationId = z.uuid().parse(options.investigationId ?? deps.uuid())
   const { graph, scenarios } = await loadDemoContext(deps)
   const classification = await deps.classify(
     question,
@@ -216,6 +217,7 @@ export async function createScenarioInvestigation(
   scenarioId: string,
   body: unknown,
   deps: InvestigationServiceDependencies = investigationServiceDependencies,
+  options: { investigationId?: string } = {},
 ) {
   const id = z.uuid().parse(scenarioId)
   const request = z
@@ -225,7 +227,7 @@ export async function createScenarioInvestigation(
   const { graph, scenarios } = await loadDemoContext(deps)
   const scenario = scenarios.find((candidate) => candidate.id === id)
   if (!scenario) throw new DemoBoundaryError()
-  const investigationId = z.uuid().parse(deps.uuid())
+  const investigationId = z.uuid().parse(options.investigationId ?? deps.uuid())
   const baseline = scenario.slug === 'baseline'
   const intent = investigationIntentSchema.parse(
     baseline
@@ -277,7 +279,10 @@ function writeText(
   writer.write({ type: 'text-end', id })
 }
 
-export function chatOutcomeResponse(outcome: ChatInvestigationOutcome) {
+export function chatOutcomeResponse(
+  outcome: ChatInvestigationOutcome,
+  headers?: HeadersInit,
+) {
   const stream = createUIMessageStream<BuildGraphUIMessage>({
     execute: ({ writer }) => {
       if (outcome.kind === 'unsupported') {
@@ -309,7 +314,7 @@ export function chatOutcomeResponse(outcome: ChatInvestigationOutcome) {
     },
     onError: () => 'The investigation response could not be streamed.',
   })
-  return createUIMessageStreamResponse({ stream })
+  return createUIMessageStreamResponse({ stream, headers })
 }
 
 export function serializeInvestigation(investigation: Investigation) {

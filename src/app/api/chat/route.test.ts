@@ -50,8 +50,12 @@ describe('POST /api/chat', () => {
     expect(createQuestionInvestigation).toHaveBeenCalledWith(
       'Write release announcement copy.',
       undefined,
-      { gatewayApiKey: 'user-owned-gateway-key-for-tests' },
+      {
+        gatewayApiKey: 'user-owned-gateway-key-for-tests',
+        investigationId: expect.any(String),
+      },
     )
+    expect(response.headers.get('x-correlation-id')).toMatch(/^[0-9a-f-]{36}$/)
   })
 
   it('refuses AI analysis without a user-owned API key', async () => {
