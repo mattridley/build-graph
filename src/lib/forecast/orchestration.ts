@@ -216,7 +216,7 @@ function buildInput(
     investigationId: investigation.id,
     seed: investigation.randomSeed,
     sampleCount: 2_500,
-    shardSize: 250,
+    shardSize: 2_500,
     project: {
       id: graph.project.id,
       name: graph.project.name,
@@ -245,13 +245,15 @@ function aggregatePersistedScenario(
   scenario: ForecastScenario,
   samples: StoredForecastSample[],
 ) {
+  const expectedSampleCount = input.sampleCount ?? 2_500
   if (
-    samples.length !== 2_500 ||
-    new Set(samples.map((sample) => sample.sample_number)).size !== 2_500
+    samples.length !== expectedSampleCount ||
+    new Set(samples.map((sample) => sample.sample_number)).size !==
+      expectedSampleCount
   ) {
     throw new ForecastWorkflowError(
       'aggregation_failure',
-      `Scenario ${scenario.name} does not contain 2,500 unique samples.`,
+      `Scenario ${scenario.name} does not contain ${expectedSampleCount.toLocaleString('en-GB')} unique samples.`,
       true,
     )
   }
@@ -307,6 +309,7 @@ function renderResult(
   aggregates: ReturnType<typeof aggregatePersistedScenario>[],
   baselineImpacts: StoredForecastImpact[],
 ) {
+  const sampleCount = input.sampleCount ?? 2_500
   const baseline = aggregates[0]!
   const graph = applyForecastScenario(
     input.nodes,
@@ -349,7 +352,7 @@ function renderResult(
   return forecastResultSchema.parse({
     investigationId: input.investigationId,
     seed: input.seed,
-    sampleCount: 2_500,
+    sampleCount,
     verdict: {
       headline: `${input.project.name} has a ${Math.round(baseline.probability * 100)}% on-time probability by ${input.project.targetDate}.`,
       targetDate: input.project.targetDate,
@@ -392,7 +395,7 @@ function renderResult(
     evidence: [
       {
         label: 'Durable simulation samples',
-        value: '2500',
+        value: String(sampleCount),
         source: 'simulation',
         detail: `Seed ${input.seed}; aggregated after all child shards were persisted.`,
       },
@@ -435,11 +438,6 @@ export async function executeForecastWorkflow(
   try {
     investigation = await dependencies.loadInvestigation(investigationId)
     await dependencies.markRunning(investigation.id, runId)
-    await dependencies.tagRun([
-      `project:${investigation.projectId}`,
-      `investigation:${investigation.id}`,
-      `seed:${investigation.randomSeed}`,
-    ])
     report({
       stage,
       percentage: 5,
@@ -462,9 +460,12 @@ export async function executeForecastWorkflow(
       savedScenarios,
       distributions,
     )
-    await dependencies.tagRun(
-      prepared.scenarios.map((scenario) => `scenario:${scenario.id}`),
-    )
+    await dependencies.tagRun([
+      `project:${investigation.projectId}`,
+      `investigation:${investigation.id}`,
+      `seed:${investigation.randomSeed}`,
+      ...prepared.scenarios.map((scenario) => `scenario:${scenario.id}`),
+    ])
     for (const scenario of prepared.scenarios) {
       applyForecastScenario(
         prepared.input.nodes,
@@ -473,7 +474,10 @@ export async function executeForecastWorkflow(
         scenario,
       )
     }
-    const totalShards = prepared.scenarios.length * 10
+    const sampleCount = prepared.input.sampleCount ?? 2_500
+    const shardSize = prepared.input.shardSize ?? sampleCount
+    const shardsPerScenario = Math.ceil(sampleCount / shardSize)
+    const totalShards = prepared.scenarios.length * shardsPerScenario
     report({
       stage,
       percentage: 10,
@@ -484,51 +488,51 @@ export async function executeForecastWorkflow(
 
     stage = 'simulating'
     let completedShards = 0
-    for (const scenario of prepared.scenarios) {
-      report({
-        stage,
-        percentage: 10 + (completedShards / totalShards) * 65,
-        completedShards,
-        totalShards,
-        scenarioLabel: scenario.name,
-      })
-      const payloads = Array.from({ length: 10 }, (_, shardIndex) => ({
+    report({
+      stage,
+      percentage: 10,
+      completedShards,
+      totalShards,
+      scenarioLabel: null,
+    })
+    const payloads = prepared.scenarios.flatMap((scenario) =>
+      Array.from({ length: shardsPerScenario }, (_, shardIndex) => ({
         input: prepared.input,
         scenario,
         shardIndex,
-        firstSample: shardIndex * 250,
-        sampleCount: 250,
+        firstSample: shardIndex * shardSize,
+        sampleCount: Math.min(shardSize, sampleCount - shardIndex * shardSize),
         baseSeed: prepared.input.seed,
-      }))
-      const batch = await dependencies.triggerShardBatch(payloads)
-      if (batch.length !== payloads.length) {
-        throw new ForecastWorkflowError(
-          'child_failure',
-          `Expected ${payloads.length} ${scenario.name} shards but received ${batch.length}.`,
-          true,
-        )
-      }
-      const failed = batch.find((result) => !result.ok)
-      if (failed) {
-        throw new ForecastWorkflowError(
-          'child_failure',
-          `A ${scenario.name} simulation shard failed.`,
-          true,
-          { cause: failed.error },
-        )
-      }
-      for (const result of batch) {
-        if (result.ok) simulationShardSummarySchema.parse(result.output)
-      }
-      completedShards += batch.length
-      report({
-        stage,
-        percentage: 10 + (completedShards / totalShards) * 65,
-        completedShards,
-        totalShards,
-        scenarioLabel: scenario.name,
-      })
+      })),
+    )
+    const batch = await dependencies.triggerShardBatch(payloads)
+    if (batch.length !== payloads.length) {
+      throw new ForecastWorkflowError(
+        'child_failure',
+        `Expected ${payloads.length} simulation shards but received ${batch.length}.`,
+        true,
+      )
     }
+    const failed = batch.find((result) => !result.ok)
+    if (failed) {
+      throw new ForecastWorkflowError(
+        'child_failure',
+        'A simulation shard failed.',
+        true,
+        { cause: failed.error },
+      )
+    }
+    for (const result of batch) {
+      if (result.ok) simulationShardSummarySchema.parse(result.output)
+    }
+    completedShards = batch.length
+    report({
+      stage,
+      percentage: 75,
+      completedShards,
+      totalShards,
+      scenarioLabel: null,
+    })
 
     stage = 'aggregating'
     report({
@@ -570,7 +574,7 @@ export async function executeForecastWorkflow(
       p50: aggregate.p50,
       p80: aggregate.p80,
       p95: aggregate.p95,
-      sampleCount: 2_500,
+      sampleCount,
     }))
     await dependencies.persistCompletion(investigation, result, summaries)
     stage = 'complete'

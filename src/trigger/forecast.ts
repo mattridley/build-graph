@@ -28,7 +28,7 @@ import {
 
 const simulationQueue = queue({
   name: 'forecast-simulation',
-  concurrencyLimit: 10,
+  concurrencyLimit: 1,
 })
 
 export const simulateScenarioTask = task({

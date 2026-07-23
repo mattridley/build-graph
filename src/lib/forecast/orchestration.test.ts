@@ -155,7 +155,7 @@ function harness() {
 }
 
 describe('forecast parent workflow', () => {
-  it('fans out ten shards, aggregates durable output, and is parent-idempotent', async () => {
+  it('fans out one durable shard per scenario and is parent-idempotent', async () => {
     const test = harness()
     const first = await executeForecastWorkflow(
       workflowIds.investigation,
@@ -167,9 +167,9 @@ describe('forecast parent workflow', () => {
       'run-1',
       test.dependencies,
     )
-    expect(first.totalShards).toBe(10)
-    expect(first.completedShards).toBe(10)
-    expect(second.completedShards).toBe(10)
+    expect(first.totalShards).toBe(1)
+    expect(first.completedShards).toBe(1)
+    expect(second.completedShards).toBe(1)
     expect(test.samples).toHaveLength(2_500)
     expect(test.impactRows.length).toBeGreaterThan(0)
     expect(test.persisted()).toBeDefined()
@@ -178,7 +178,7 @@ describe('forecast parent workflow', () => {
     )
     expect(test.progress.at(-1)).toEqual({
       stage: 'complete',
-      completedShards: 10,
+      completedShards: 1,
     })
     const singleProcess = forecastRelease(workflowEngineInput())
     expect(first.result.verdict.onTimeProbability).toBe(

@@ -1,5 +1,7 @@
 # BuildGraph
 
+[![CI](https://github.com/mattridley/build-graph/actions/workflows/ci.yml/badge.svg)](https://github.com/mattridley/build-graph/actions/workflows/ci.yml)
+
 BuildGraph is a delivery-risk investigation workspace that combines a dependency graph, a seeded Monte Carlo forecast, evidence, and what-if scenarios. The MVP uses the fictional Atlas release and deterministic synthetic history.
 
 > **Synthetic demo:** every Atlas project, person, repository reference, delivery event, CI run, and scenario is fictional. BuildGraph is decision support—not a promise of a delivery date.
@@ -106,7 +108,7 @@ The Next.js build deliberately succeeds without service variables. Connections a
 
 `seed-demo-data` upserts the 42-node/52-dependency graph and three scenarios, then streams 250,000 delivery events and 50,000 CI runs across 18 completed cohorts. Stable UUIDs, a fixture SHA-256, generator version, counts, and seed provenance are stored with the demo record. Re-running is safe because operational rows have stable IDs and analytical chunks use stable deduplication tokens plus ID checks.
 
-The generator uses Europe/London weekdays from 09:00–17:00 and does not model holidays. The engine runs 2,500 samples per production scenario, uses triangular duration sampling, exact → kind → global history fallback, and business-time DAG scheduling. The same seed and sample identity produce the same result across shard boundaries.
+The generator uses Europe/London weekdays from 09:00–17:00 and does not model holidays. The engine runs 2,500 samples per production scenario, uses triangular duration sampling, exact → size cohort → kind → global history fallback, and business-time DAG scheduling. The same seed and sample identity produce the same result across shard boundaries.
 
 Limitations:
 
@@ -151,4 +153,4 @@ Integration tests run migrations twice against Postgres and ClickHouse, then cov
 | Safety and responsibility | Synthetic provenance, explicit limitations, normalized errors, BYOK-only AI, secret scan         |
 | Demo readiness            | Seed verification, responsive browser tests, correlation trail, timed script and checklist       |
 
-Final production and video links are recorded in [the submission checklist](./docs/submission-checklist.md) after deployment and rehearsal.
+The production demo is live at [build-graph.vercel.app](https://build-graph.vercel.app). Final submission evidence and the video link are recorded in [the submission checklist](./docs/submission-checklist.md).

@@ -64,7 +64,7 @@ export async function loadForecastDistributions(
       p90: row.p90,
       sampleCount: row.sample_count,
     }
-    if (row.fallbackLevel === 'exact') {
+    if (row.fallbackLevel === 'exact' || row.fallbackLevel === 'cohort') {
       cycle.push({ kind: item.kind, size: item.size, ...distribution })
     } else if (row.fallbackLevel === 'kind' && !seenKind.has(item.kind)) {
       seenKind.add(item.kind)
