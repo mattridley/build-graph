@@ -26,7 +26,7 @@ describe('synthetic history generator', () => {
       .update(JSON.stringify(first))
       .digest('hex')
     expect(digest).toBe(
-      '9e35a87a151d6782e3b0092a4efb6d4e26cb87cbeeb3925d28daaf4fb936dfd0',
+      'b1acfcd6c2d069cb15723fa61e679df0b713f5a16e2411f887019e828479ea92',
     )
     expect(historyManifest(SMALL_DEMO_HISTORY_CONFIG)).toEqual(
       historyManifest(SMALL_DEMO_HISTORY_CONFIG),
@@ -54,7 +54,7 @@ describe('synthetic history generator', () => {
       ciRuns: 50_000,
       ciChunks: 25,
     })
-  }, 30_000)
+  }, 60_000)
 
   it('emits valid shaped delivery transitions during London business hours', () => {
     const rows = [

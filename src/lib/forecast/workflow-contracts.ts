@@ -83,7 +83,7 @@ export const simulationShardPayloadSchema = z.object({
   scenario,
   shardIndex: z.number().int().nonnegative(),
   firstSample: z.number().int().nonnegative(),
-  sampleCount: z.number().int().min(1).max(250),
+  sampleCount: z.number().int().min(1).max(2_500),
   baseSeed: z.number().int(),
 })
 

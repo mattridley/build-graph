@@ -14,9 +14,6 @@ importers:
       '@clickhouse/client':
         specifier: ^1.12.1
         version: 1.23.1
-      '@neondatabase/serverless':
-        specifier: ^1.0.2
-        version: 1.1.0
       '@streamdown/cjk':
         specifier: ^1.0.3
         version: 1.0.3(@types/mdast@4.0.4)(micromark-util-types@2.0.2)(micromark@4.0.2)(react@19.2.7)(unified@11.0.5)
@@ -52,7 +49,7 @@ importers:
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       drizzle-orm:
         specifier: ^0.44.7
-        version: 0.44.7(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(postgres@3.4.9)
+        version: 0.44.7(@opentelemetry/api@1.9.1)(postgres@3.4.9)
       lucide-react:
         specifier: ^1.25.0
         version: 1.25.0(react@19.2.7)
@@ -701,10 +698,6 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
-
-  '@neondatabase/serverless@1.1.0':
-    resolution: {integrity: sha512-r3ZZhRjEcfEdKIZnoB1RusNgvHuaBRqfCzV4Gi+5A9yUX0S4HTws/ASWqt13wL4y4I+0rqsWGdA2w7EQXHi3+Q==}
-    engines: {node: '>=19.0.0'}
 
   '@next/env@16.2.10':
     resolution: {integrity: sha512-zLPxg9M0MEHmygpj5OuxjQ+vHMiy/K7cSp74G8ecYolmgUWw0RwN02tF56npup/+qaI8JB97hQgS/r2Hb6QwVA==}
@@ -6445,8 +6438,6 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
-  '@neondatabase/serverless@1.1.0': {}
-
   '@next/env@16.2.10': {}
 
   '@next/eslint-plugin-next@16.2.10':
@@ -8796,9 +8787,8 @@ snapshots:
 
   dotenv@17.4.2: {}
 
-  drizzle-orm@0.44.7(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(postgres@3.4.9):
+  drizzle-orm@0.44.7(@opentelemetry/api@1.9.1)(postgres@3.4.9):
     optionalDependencies:
-      '@neondatabase/serverless': 1.1.0
       '@opentelemetry/api': 1.9.1
       postgres: 3.4.9
 

@@ -23,7 +23,7 @@ const cycleTimeRow = z.object({
   sample_count: z.coerce.number().int().nonnegative(),
 })
 
-export type FallbackLevel = 'exact' | 'kind' | 'global'
+export type FallbackLevel = 'exact' | 'cohort' | 'kind' | 'global'
 
 async function firstRow<T>(
   client: ClickHouseClient,
@@ -66,6 +66,11 @@ export async function queryCycleTimeQuantiles(
       where:
         'project_id = {projectId:UUID} AND item_kind = {itemKind:String} AND size = {size:String} AND starting_status = {startingStatus:String}',
       params: value,
+    },
+    {
+      level: 'cohort',
+      where: "item_kind != 'milestone' AND size = {size:String}",
+      params: { size: value.size },
     },
     {
       level: 'kind',

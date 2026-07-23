@@ -69,7 +69,7 @@ function defaultDependencies(
     insertSamples: (rows, token) =>
       insertForecastSamples(rows, {
         client,
-        chunkSize: 250,
+        chunkSize: 2_000,
         deduplicationToken: token,
         correlationId: rows[0]?.investigation_id,
       }),

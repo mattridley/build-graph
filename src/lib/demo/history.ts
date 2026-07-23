@@ -88,6 +88,26 @@ const itemKinds = [
 ] as const
 const sizes = ['xs', 's', 's', 'm', 'm', 'm', 'l', 'l', 'xl'] as const
 
+const calibratedCycleHours = {
+  xs: { p25: 1, p50: 3, p90: 9 },
+  s: { p25: 3, p50: 7, p90: 22 },
+  m: { p25: 5, p50: 12, p90: 34 },
+  l: { p25: 8, p50: 20, p90: 50 },
+  xl: { p25: 30, p50: 55, p90: 90 },
+} as const
+
+function completedDurationHours(
+  size: DemoDeliveryEvent['size'],
+  localItem: number,
+  projectIndex: number,
+) {
+  const percentileIndex = (localItem * 17 + projectIndex * 5) % 109
+  const distribution = calibratedCycleHours[size]
+  if (percentileIndex <= 40) return distribution.p25
+  if (percentileIndex <= 96) return distribution.p50
+  return distribution.p90
+}
+
 function assertConfig(config: DemoHistoryConfig) {
   for (const [name, value] of Object.entries(config)) {
     if (!Number.isInteger(value) || value < 1)
@@ -191,7 +211,7 @@ export function* generateDeliveryEventChunks(
         eventKind === 'blocked_duration'
           ? 2 + ((localItem * 11 + projectIndex) % 39)
           : eventKind === 'completed'
-            ? 12 + ((localItem * 17 + projectIndex * 5) % 109)
+            ? completedDurationHours(size, localItem, projectIndex)
             : null,
       source: 'synthetic-atlas-generator',
       actor: null,
