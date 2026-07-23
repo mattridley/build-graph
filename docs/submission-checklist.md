@@ -2,7 +2,7 @@
 
 ## Repository and safety
 
-- [ ] Main branch CI is green.
+- [x] Main branch CI is green.
 - [x] `pnpm security:check` passes and repository history is reviewed for secrets.
 - [x] Repository is public and the README screenshot renders.
 - [x] No deployment-owned AI Gateway/OIDC credential is configured; AI is BYOK only.
