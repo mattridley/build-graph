@@ -27,7 +27,6 @@
   "dependencies": {
     "@ai-sdk/react": "^3.0.0",
     "@clickhouse/client": "^1.12.1",
-    "@neondatabase/serverless": "^1.0.2",
     "@streamdown/cjk": "^1.0.3",
     "@streamdown/code": "^1.1.1",
     "@streamdown/math": "^1.0.2",
