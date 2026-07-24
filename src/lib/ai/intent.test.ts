@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 import {
   IntentProviderError,
   classifyInvestigationIntent,
+  modelIntentSchema,
   resolveTargetDate,
   type IntentContext,
   type ModelIntent,
@@ -31,7 +33,12 @@ describe('typed investigation intent classification', () => {
   it.each([
     {
       question: 'Can Atlas ship by Friday?',
-      output: { kind: 'deadline_probability', targetDate: 'friday' },
+      output: {
+        kind: 'deadline_probability',
+        targetDate: 'friday',
+        confidence: null,
+        scenarioReferences: [],
+      },
       expected: {
         kind: 'deadline_probability',
         targetDate: '2026-07-24',
@@ -39,7 +46,12 @@ describe('typed investigation intent classification', () => {
     },
     {
       question: 'What is blocking the release?',
-      output: { kind: 'blocker_analysis', targetDate: null },
+      output: {
+        kind: 'blocker_analysis',
+        targetDate: null,
+        confidence: null,
+        scenarioReferences: [],
+      },
       expected: {
         kind: 'blocker_analysis',
         targetDate: atlas.project.targetDate,
@@ -51,6 +63,7 @@ describe('typed investigation intent classification', () => {
         kind: 'scope_to_confidence',
         targetDate: null,
         confidence: null,
+        scenarioReferences: [],
       },
       expected: {
         kind: 'scope_to_confidence',
@@ -63,6 +76,7 @@ describe('typed investigation intent classification', () => {
       output: {
         kind: 'compare_scenarios',
         targetDate: null,
+        confidence: null,
         scenarioReferences: ['defer-audit-export'],
       },
       expected: {
@@ -82,7 +96,7 @@ describe('typed investigation intent classification', () => {
         question,
         context,
         'user-owned-gateway-key-for-tests',
-        generated(output as ModelIntent),
+        generated(modelIntentSchema.parse(output)),
       )
       expect(result).toEqual({
         supported: true,
@@ -97,19 +111,41 @@ describe('typed investigation intent classification', () => {
     expect(resolveTargetDate(null, context)).toBe(atlas.project.targetDate)
   })
 
+  it('emits an OpenAI-compatible root object schema without oneOf', () => {
+    const schema = z.toJSONSchema(modelIntentSchema)
+
+    expect(schema.type).toBe('object')
+    expect(schema).not.toHaveProperty('oneOf')
+    expect(new Set((schema as { required?: string[] }).required)).toEqual(
+      new Set(['kind', 'targetDate', 'confidence', 'scenarioReferences']),
+    )
+  })
+
   it.each([
-    { kind: 'unsupported' },
+    {
+      kind: 'unsupported',
+      targetDate: null,
+      confidence: null,
+      scenarioReferences: [],
+    },
     {
       kind: 'compare_scenarios',
       targetDate: null,
+      confidence: null,
       scenarioReferences: ['invented emergency plan'],
     },
     {
       kind: 'scope_to_confidence',
       targetDate: null,
       confidence: 4.2,
+      scenarioReferences: [],
     },
-    { kind: 'deadline_probability', targetDate: 'DROP TABLE projects' },
+    {
+      kind: 'deadline_probability',
+      targetDate: 'DROP TABLE projects',
+      confidence: null,
+      scenarioReferences: [],
+    },
   ])('fails closed for ambiguous or adversarial output %#', async (output) => {
     await expect(
       classifyInvestigationIntent(
