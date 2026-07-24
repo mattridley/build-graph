@@ -11,21 +11,30 @@ import { readOptionalRuntimeEnvironment } from '@/lib/env'
 
 const targetDate = z.string().trim().min(1).max(40).nullable()
 
-export const modelIntentSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('deadline_probability'), targetDate }),
-  z.object({ kind: z.literal('blocker_analysis'), targetDate }),
-  z.object({
-    kind: z.literal('scope_to_confidence'),
-    targetDate,
-    confidence: z.number().nullable(),
-  }),
-  z.object({
-    kind: z.literal('compare_scenarios'),
-    targetDate,
-    scenarioReferences: z.array(z.string().trim().min(1).max(200)).max(2),
-  }),
-  z.object({ kind: z.literal('unsupported') }),
-])
+export const modelIntentSchema = z.object({
+  kind: z.enum([
+    'deadline_probability',
+    'blocker_analysis',
+    'scope_to_confidence',
+    'compare_scenarios',
+    'unsupported',
+  ]),
+  targetDate: targetDate.describe(
+    'Requested deadline expression, or null when none was supplied.',
+  ),
+  confidence: z
+    .number()
+    .min(0)
+    .max(1)
+    .nullable()
+    .describe('Requested confidence for scope_to_confidence; otherwise null.'),
+  scenarioReferences: z
+    .array(z.string().trim().min(1).max(200))
+    .max(2)
+    .describe(
+      'Scenario names, slugs, or IDs for compare_scenarios; otherwise an empty array.',
+    ),
+})
 
 export type ModelIntent = z.infer<typeof modelIntentSchema>
 
@@ -60,7 +69,7 @@ export class IntentProviderError extends Error {
 }
 
 const systemInstruction =
-  'Classify Atlas delivery questions into one approved intent. Never invent state, write SQL, calculate forecasts, or produce prose. Use only supplied scenario and scope references; otherwise return unsupported.'
+  'Classify Atlas delivery questions into one approved intent. Always return all four fields. Use null for an absent targetDate, null for confidence unless the intent is scope_to_confidence, and an empty scenarioReferences array unless the intent is compare_scenarios. Never invent state, write SQL, calculate forecasts, or produce prose. Use only supplied scenario and scope references; otherwise return unsupported.'
 
 async function gatewayIntentGenerator({
   question,
