@@ -16,6 +16,7 @@ import {
   MessageContent,
   MessageResponse,
 } from '@/components/ai-elements/message'
+import { Loader } from '@/components/ai-elements/loader'
 import {
   PromptInput,
   PromptInputBody,
@@ -42,6 +43,7 @@ export const examplePrompts = [
 interface ConversationPanelProps {
   messages: BuildGraphUIMessage[]
   status: ChatStatus
+  hasError: boolean
   apiKey: string
   activeInvestigationId: string | null
   onApiKeyChange: (value: string) => void
@@ -56,6 +58,7 @@ interface ConversationPanelProps {
 export function ConversationPanel({
   messages,
   status,
+  hasError,
   apiKey,
   activeInvestigationId,
   onApiKeyChange,
@@ -67,6 +70,17 @@ export function ConversationPanel({
   onStop,
 }: ConversationPanelProps) {
   const busy = status === 'submitted' || status === 'streaming'
+  const thinking =
+    status === 'submitted'
+      ? {
+          title: 'Reading your question',
+          detail: 'Classifying intent and gathering the Atlas context.',
+        }
+      : {
+          title: 'Building your investigation',
+          detail: 'Connecting delivery evidence to the forecast.',
+        }
+
   return (
     <section className="border-border bg-card/70 flex min-h-0 flex-col overflow-hidden rounded-xl border">
       <header className="border-border border-b px-4 py-3">
@@ -170,6 +184,60 @@ export function ConversationPanel({
               </MessageContent>
             </Message>
           ))}
+          {hasError ? (
+            <div
+              role="alert"
+              className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-amber-50"
+            >
+              <p className="text-xs font-medium">
+                Investigation could not start
+              </p>
+              <p className="mt-1 text-[10px] leading-4 text-amber-100/80">
+                Question classification failed. Check that your Vercel AI
+                Gateway key is valid and has available credits, then try again.
+              </p>
+            </div>
+          ) : null}
+          {busy ? (
+            <Message from="assistant">
+              <MessageContent>
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-label="BuildGraph is thinking"
+                  className="border-border bg-background/80 flex items-center gap-3 rounded-lg border p-3 shadow-sm"
+                >
+                  <div className="relative grid size-8 shrink-0 place-items-center rounded-full border border-cyan-300/30 bg-cyan-300/10">
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-1 animate-ping rounded-full bg-cyan-300/15 motion-reduce:animate-none"
+                    />
+                    <Loader
+                      role="presentation"
+                      aria-hidden="true"
+                      className="relative size-4 text-cyan-200 motion-reduce:animate-none"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-cyan-100">
+                      {thinking.title}
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 text-[10px] leading-4">
+                      {thinking.detail}
+                    </p>
+                  </div>
+                  <span
+                    aria-hidden="true"
+                    className="flex shrink-0 items-center gap-1"
+                  >
+                    <span className="size-1.5 animate-pulse rounded-full bg-cyan-200 motion-reduce:animate-none" />
+                    <span className="size-1.5 animate-pulse rounded-full bg-cyan-200 [animation-delay:150ms] motion-reduce:animate-none" />
+                    <span className="size-1.5 animate-pulse rounded-full bg-cyan-200 [animation-delay:300ms] motion-reduce:animate-none" />
+                  </span>
+                </div>
+              </MessageContent>
+            </Message>
+          ) : null}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
@@ -202,23 +270,51 @@ export function ConversationPanel({
         <PromptInput onSubmit={onSubmit}>
           <PromptInputBody>
             <PromptInputTextarea
-              placeholder="Ask about Atlas delivery risk…"
+              placeholder={
+                busy
+                  ? 'Investigation in progress…'
+                  : 'Ask about Atlas delivery risk…'
+              }
               disabled={busy}
               aria-label="Delivery question"
             />
           </PromptInputBody>
           <PromptInputFooter>
             <PromptInputTools>
-              <span className="text-muted-foreground font-mono text-[9px]">
-                ENTER TO INVESTIGATE
-              </span>
+              {busy ? (
+                <span
+                  aria-hidden="true"
+                  className="flex items-center gap-1.5 font-mono text-[9px] text-cyan-200"
+                >
+                  <Loader
+                    role="presentation"
+                    className="size-3 motion-reduce:animate-none"
+                  />
+                  BUILDGRAPH IS THINKING
+                </span>
+              ) : (
+                <span className="text-muted-foreground font-mono text-[9px]">
+                  ENTER TO INVESTIGATE
+                </span>
+              )}
             </PromptInputTools>
             <PromptInputSubmit
               status={status}
               onStop={onStop}
-              disabled={!apiKey.trim()}
-              aria-label="Submit delivery question"
-            />
+              disabled={!busy && !apiKey.trim()}
+              aria-label={
+                busy ? 'Stop investigation' : 'Submit delivery question'
+              }
+              title={busy ? 'Stop investigation' : 'Submit delivery question'}
+            >
+              {busy ? (
+                <Loader
+                  role="presentation"
+                  aria-hidden="true"
+                  className="motion-reduce:animate-none"
+                />
+              ) : undefined}
+            </PromptInputSubmit>
           </PromptInputFooter>
         </PromptInput>
       </div>

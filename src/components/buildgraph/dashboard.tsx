@@ -88,12 +88,20 @@ export function BuildGraphDashboard({ project }: BuildGraphDashboardProps) {
       'x-buildgraph-ai-gateway-key': apiKey,
     },
   })
-  const { messages, sendMessage, setMessages, status, stop } =
-    useChat<BuildGraphUIMessage>({ transport })
+  const {
+    messages,
+    sendMessage,
+    setMessages,
+    status,
+    stop,
+    error,
+    clearError,
+  } = useChat<BuildGraphUIMessage>({ transport })
 
   function submitPrompt(prompt: string) {
     const question = prompt.trim()
     if (!question || !apiKey.trim()) return
+    clearError()
     void sendMessage({ text: question })
   }
 
@@ -189,6 +197,7 @@ export function BuildGraphDashboard({ project }: BuildGraphDashboardProps) {
             <ConversationPanel
               messages={messages}
               status={status}
+              hasError={Boolean(error)}
               apiKey={apiKey}
               activeInvestigationId={activeArtifact?.investigationId ?? null}
               onApiKeyChange={setApiKey}
