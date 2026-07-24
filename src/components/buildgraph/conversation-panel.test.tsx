@@ -12,11 +12,14 @@ import type { BuildGraphUIMessage } from '@/lib/ai/contracts'
 function renderPanel(
   messages: BuildGraphUIMessage[] = [],
   status: 'ready' | 'submitted' | 'streaming' | 'error' = 'ready',
+  apiKey = '',
+  hasError = false,
 ) {
   const props = {
     messages,
     status,
-    apiKey: '',
+    hasError,
+    apiKey,
     activeInvestigationId: null,
     onApiKeyChange: vi.fn(),
     onSubmit: vi.fn(),
@@ -53,6 +56,28 @@ describe('ConversationPanel', () => {
   it('disables only the current message input while streaming', () => {
     renderPanel([], 'streaming')
     expect(screen.getByLabelText('Delivery question')).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Stop investigation' }),
+    ).toBeEnabled()
+  })
+
+  it('shows and announces meaningful investigation progress', () => {
+    const { props, rerender } = renderPanel([], 'submitted', 'user-key')
+
+    expect(
+      screen.getByRole('status', { name: 'BuildGraph is thinking' }),
+    ).toHaveTextContent('Reading your question')
+    expect(
+      screen.getByPlaceholderText('Investigation in progress…'),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Stop investigation' }),
+    ).toBeEnabled()
+
+    rerender(<ConversationPanel {...props} status="streaming" />)
+    expect(
+      screen.getByRole('status', { name: 'BuildGraph is thinking' }),
+    ).toHaveTextContent('Building your investigation')
   })
 
   it('renders normalized errors without exposing internals', () => {
@@ -74,6 +99,17 @@ describe('ConversationPanel', () => {
     renderPanel(messages)
     expect(screen.getByRole('alert')).toHaveTextContent(
       'The forecast service is temporarily unavailable.',
+    )
+  })
+
+  it('shows a safe, actionable error when the chat request fails', () => {
+    renderPanel([], 'error', 'user-key', true)
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Investigation could not start',
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Check that your Vercel AI Gateway key is valid and has available credits',
     )
   })
 
